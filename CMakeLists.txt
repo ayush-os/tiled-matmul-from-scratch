@@ -10,8 +10,6 @@ set(CUDA_PROPAGATE_HOST_FLAGS OFF)
 
 add_executable(matmul.cu)
 
-target_include_directories(matmul PRIVATE ${CUDA_INCLUDE_DIRS})
-
 target_compile_options(matmul PRIVATE
     $<$<COMPILE_LANGUAGE:CUDA>:-std=c++14>
     $<$<COMPILE_LANGUAGE:CUDA>:-O3>
