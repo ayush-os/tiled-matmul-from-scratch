@@ -8,8 +8,8 @@ const int MATRIX_DIM = 4096;
 __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
                             const float *B, float beta, float *C)
 {
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
+    int y = blockIdx.x * blockDim.x + threadIdx.x;
+    int x = blockIdx.y * blockDim.y + threadIdx.y;
 
     float res = 0.f;
     for (int i = 0; i < K; i++) {
