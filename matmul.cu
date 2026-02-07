@@ -8,14 +8,15 @@ const int MATRIX_DIM = 4096;
 __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
                             const float *B, float beta, float *C)
 {
-  const int x = blockIdx.x * BLOCKSIZE + (threadIdx.x / BLOCKSIZE);
-  const int y = blockIdx.y * BLOCKSIZE + (threadIdx.x % BLOCKSIZE);
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-  float tmp = 0.0;
-  for (int i = 0; i < K; ++i)
-    tmp += A[x * K + i] * B[i * N + y];
+    float res = 0.f;
+    for (int i = 0; i < K; i++) {
+      res += A[K * y + i] * B[N * i + x];
+    }
 
-    C[x * N + y] = tmp;
+    C[N * y + x] = res;
 }
 
 void checkCudaError(cudaError_t err, const char *msg) {
