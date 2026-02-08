@@ -4,14 +4,13 @@
 #include <vector>
 
 const int MATRIX_DIM = 4096;
-const int A_TILE_X = 128;
 const int TILE_SIZE = 16;
 const int MICRO_TILE = 8;
 
 __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
                               const float *B, float beta, float *C)
 {
-  __shared__ float A_tile[A_TILE_X][TILE_SIZE];
+  __shared__ float A_tile[TILE_SIZE * MICRO_TILE][TILE_SIZE];
   __shared__ float B_tile[TILE_SIZE][TILE_SIZE];
 
   int x = blockIdx.x * TILE_SIZE + threadIdx.x;
