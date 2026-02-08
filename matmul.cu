@@ -39,7 +39,7 @@ __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
   }
 
   for (int i = 0; i < MICRO_TILE; i++) {
-    C[N * (y + i) + x] = res[i];
+    C[N * (y_base + i) + x] = res[i];
   }
 }
 
