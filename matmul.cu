@@ -199,8 +199,7 @@ int main()
   std::vector<std::pair<int, int>> configs = {
     {8, 2}, {8, 4}, {8, 8}, {8, 16},
     {16, 2}, {16, 4}, {16, 8}, {16, 16},
-    {32, 2}, {32, 4}, {32, 8},
-    {64, 2}  // Only 64x2, NOT 64x4 or higher!
+    {32, 2}, {32, 4}, {32, 8}
   };
 
   std::vector<Config> results;
