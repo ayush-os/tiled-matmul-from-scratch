@@ -6,29 +6,33 @@
 const int MATRIX_DIM = 4096;
 
 __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
-                            const float *B, float beta, float *C)
+                              const float *B, float beta, float *C)
 {
-    int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int y = blockIdx.y * blockDim.y + threadIdx.y;
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
+  int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    float res = 0.f;
-    for (int i = 0; i < K; i++) {
-      res += A[K * y + i] * B[N * i + x];
-    }
+  float res = 0.f;
+  for (int i = 0; i < K; i++)
+  {
+    res += A[K * y + i] * B[N * i + x];
+  }
 
-    C[N * y + x] = res;
+  C[N * y + x] = res;
 }
 
-void checkCudaError(cudaError_t err, const char *msg) {
-  if (err != cudaSuccess) {
+void checkCudaError(cudaError_t err, const char *msg)
+{
+  if (err != cudaSuccess)
+  {
     std::cerr << "CUDA Error: " << msg << " - " << cudaGetErrorString(err)
               << std::endl;
     exit(EXIT_FAILURE);
   }
 }
 
-int main() {
-  const int N_TOTAL = MATRIX_DIM * MATRIX_DIM; 
+int main()
+{
+  const int N_TOTAL = MATRIX_DIM * MATRIX_DIM;
   const size_t bytes = N_TOTAL * sizeof(float);
 
   const int WARMUP_RUNS = 10;
@@ -61,7 +65,8 @@ int main() {
   cudaEventCreate(&stop);
 
   std::cout << "Warming up..." << std::endl;
-  for (int i = 0; i < WARMUP_RUNS; ++i) {
+  for (int i = 0; i < WARMUP_RUNS; ++i)
+  {
     // Calling C = 1.0 * (A * B) + 0.0 * C
     matmul_kernel<<<numBlocks, threadsPerBlock>>>(MATRIX_DIM, MATRIX_DIM, MATRIX_DIM, 1.0f, d_A, d_B, 0.0f, d_C);
   }
@@ -70,11 +75,12 @@ int main() {
   float total_milliseconds = 0;
   std::cout << "Starting Timing Loop (" << TIMING_RUNS << " runs)..." << std::endl;
 
-  for (int i = 0; i < TIMING_RUNS; ++i) {
+  for (int i = 0; i < TIMING_RUNS; ++i)
+  {
     cudaEventRecord(start);
-    
+
     matmul_kernel<<<numBlocks, threadsPerBlock>>>(MATRIX_DIM, MATRIX_DIM, MATRIX_DIM, 1.0f, d_A, d_B, 0.0f, d_C);
-    
+
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
@@ -90,20 +96,25 @@ int main() {
   checkCudaError(cudaMemcpy(h_C.data(), d_C, bytes, cudaMemcpyDeviceToHost), "C copy D->H");
 
   // Simple Verification (For A=1.0, B=2.0, result should be 1.0 * 2.0 * MATRIX_DIM)
-  float expected = (float)MATRIX_DIM * 2.0f; 
+  float expected = (float)MATRIX_DIM * 2.0f;
   bool passed = true;
-  for (int i = 0; i < 10; ++i) { // Check first 10 elements
-      if (std::abs(h_C[i] - expected) > 1e-3) {
-          passed = false;
-          break;
-      }
+  for (int i = 0; i < 10; ++i)
+  { // Check first 10 elements
+    if (std::abs(h_C[i] - expected) > 1e-3)
+    {
+      passed = false;
+      break;
+    }
   }
 
-  if (passed) {
-      std::cout << "Verification: PASSED (checked sample of results)" << std::endl;
-  } else {
-      std::cout << "Verification: FAILED" << std::endl;
-      std::cout << "Sample Result: " << h_C[0] << " | Expected: " << expected << std::endl;
+  if (passed)
+  {
+    std::cout << "Verification: PASSED (checked sample of results)" << std::endl;
+  }
+  else
+  {
+    std::cout << "Verification: FAILED" << std::endl;
+    std::cout << "Sample Result: " << h_C[0] << " | Expected: " << expected << std::endl;
   }
 
   // Cleanup
