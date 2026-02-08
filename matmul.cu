@@ -4,17 +4,29 @@
 #include <vector>
 
 const int MATRIX_DIM = 4096;
+const int TILE_SIZE = 32;
 
 __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
                               const float *B, float beta, float *C)
 {
+  __shared__ float A_tile[TILE_SIZE][TILE_SIZE];
+  __shared__ float B_tile[TILE_SIZE][TILE_SIZE];
+
   int x = blockIdx.x * blockDim.x + threadIdx.x;
   int y = blockIdx.y * blockDim.y + threadIdx.y;
 
   float res = 0.f;
-  for (int i = 0; i < K; i++)
-  {
-    res += A[K * y + i] * B[N * i + x];
+  for (int k = 0; k < K; k += TILE_SIZE) {
+    A_tile[threadIdx.y][threadIdx.x] = A[y * K + (k + threadIdx.x)];
+    B_tile[threadIdx.y][threadIdx.x] = B[(k + threadIdx.y) * N + x];
+
+    __syncthreads();
+
+    for (int i = 0; i < TILE_SIZE; i++) {
+      res += A_tile[threadIdx.y][i] * B_tile[i][threadIdx.x];
+    }
+
+    __syncthreads();
   }
 
   C[N * y + x] = res;
@@ -57,8 +69,8 @@ int main()
   checkCudaError(cudaMemcpy(d_B, h_B.data(), bytes, cudaMemcpyHostToDevice), "B copy H->D");
   checkCudaError(cudaMemset(d_C, 0, bytes), "C zeroing");
 
-  dim3 threadsPerBlock(32, 32, 1);
-  dim3 numBlocks(MATRIX_DIM / 32, MATRIX_DIM / 32);
+  dim3 threadsPerBlock(TILE_SIZE, TILE_SIZE, 1);
+  dim3 numBlocks(MATRIX_DIM / TILE_SIZE, MATRIX_DIM / TILE_SIZE);
 
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
