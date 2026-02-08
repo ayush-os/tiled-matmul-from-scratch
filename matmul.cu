@@ -4,32 +4,43 @@
 #include <vector>
 
 const int MATRIX_DIM = 4096;
-const int TILE_SIZE = 32;
+const int A_TILE_X = 128;
+const int TILE_SIZE = 16;
+const int MICRO_TILE = 8;
 
 __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
                               const float *B, float beta, float *C)
 {
-  __shared__ float A_tile[TILE_SIZE][TILE_SIZE];
+  __shared__ float A_tile[A_TILE_X][TILE_SIZE];
   __shared__ float B_tile[TILE_SIZE][TILE_SIZE];
 
-  int x = blockIdx.x * blockDim.x + threadIdx.x;
-  int y = blockIdx.y * blockDim.y + threadIdx.y;
+  int x = blockIdx.x * TILE_SIZE + threadIdx.x;
+  int y_base = (blockIdx.y * TILE_SIZE * MICRO_TILE) + threadIdx.y;
 
-  float res = 0.f;
+  float res[MICRO_TILE] = {0.f};
   for (int k = 0; k < K; k += TILE_SIZE) {
-    A_tile[threadIdx.y][threadIdx.x] = A[y * K + (k + threadIdx.x)];
+    for (int i = 0; i < MICRO_TILE; i++) {
+      int load_row = (blockIdx.y * TILE_SIZE * MICRO_TILE) + (i * TILE_SIZE + threadIdx.y);
+      int load_col = k + threadIdx.x;
+      A_tile[i * TILE_SIZE + threadIdx.y][threadIdx.x] = A[load_row * K + load_col];
+    }
     B_tile[threadIdx.y][threadIdx.x] = B[(k + threadIdx.y) * N + x];
 
     __syncthreads();
 
     for (int i = 0; i < TILE_SIZE; i++) {
-      res += A_tile[threadIdx.y][i] * B_tile[i][threadIdx.x];
+      float b_val = B_tile[i][threadIdx.x];
+      for (int j = 0; j < MICRO_TILE; j++) {
+        res[j] += A_tile[threadIdx.y + j * TILE_SIZE][i] * b_val;
+      }
     }
 
     __syncthreads();
   }
 
-  C[N * y + x] = res;
+  for (int i = 0; i < MICRO_TILE; i++) {
+    C[N * (y + i) + x] = res[i];
+  }
 }
 
 void checkCudaError(cudaError_t err, const char *msg)
@@ -70,7 +81,7 @@ int main()
   checkCudaError(cudaMemset(d_C, 0, bytes), "C zeroing");
 
   dim3 threadsPerBlock(TILE_SIZE, TILE_SIZE, 1);
-  dim3 numBlocks(MATRIX_DIM / TILE_SIZE, MATRIX_DIM / TILE_SIZE);
+  dim3 numBlocks(MATRIX_DIM / TILE_SIZE, MATRIX_DIM / (TILE_SIZE * MICRO_TILE));
 
   cudaEvent_t start, stop;
   cudaEventCreate(&start);
