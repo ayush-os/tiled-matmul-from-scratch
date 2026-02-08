@@ -10,16 +10,17 @@ const int MICRO_TILE = 8;
 __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
                               const float *B, float beta, float *C)
 {
-  __shared__ float A_tile[TILE_SIZE * MICRO_TILE][TILE_SIZE];
-  __shared__ float B_tile[TILE_SIZE][TILE_SIZE];
+  __shared__ float A_tile[TILE_SIZE * MICRO_TILE][TILE_SIZE + 1];
+  __shared__ float B_tile[TILE_SIZE][TILE_SIZE + 1];
 
   int x = blockIdx.x * TILE_SIZE + threadIdx.x;
   int y_base = (blockIdx.y * TILE_SIZE * MICRO_TILE) + threadIdx.y;
 
   float res[MICRO_TILE] = {0.f};
   for (int k = 0; k < K; k += TILE_SIZE) {
+    #pragma unroll
     for (int i = 0; i < MICRO_TILE; i++) {
-      int load_row = (blockIdx.y * TILE_SIZE * MICRO_TILE) + (i * TILE_SIZE + threadIdx.y);
+      int load_row = y_base + (i * TILE_SIZE);
       int load_col = k + threadIdx.x;
       A_tile[i * TILE_SIZE + threadIdx.y][threadIdx.x] = A[load_row * K + load_col];
     }
@@ -27,8 +28,10 @@ __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
 
     __syncthreads();
 
+    #pragma unroll
     for (int i = 0; i < TILE_SIZE; i++) {
       float b_val = B_tile[i][threadIdx.x];
+      #pragma unroll
       for (int j = 0; j < MICRO_TILE; j++) {
         res[j] += A_tile[threadIdx.y + j * TILE_SIZE][i] * b_val;
       }
