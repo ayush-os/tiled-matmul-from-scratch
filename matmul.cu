@@ -126,23 +126,34 @@ float benchmark_config(float *d_A, float *d_B, float *d_C, int warmup, int timin
 float run_config(int tile_size, int micro_tile, float *d_A, float *d_B, float *d_C, 
                  int warmup, int timing_runs)
 {
+  // ONLY include configurations that fit in shared memory!
+  // Max shared memory is typically 48KB on most GPUs
+  // Formula: tile_size² × (micro_tile + 1) × 4 bytes
+  
   #define RUN_CONFIG(TS, MT) \
     if (tile_size == TS && micro_tile == MT) \
       return benchmark_config<TS, MT>(d_A, d_B, d_C, warmup, timing_runs);
 
-  RUN_CONFIG(8, 2)
-  RUN_CONFIG(8, 4)
-  RUN_CONFIG(8, 8)
-  RUN_CONFIG(8, 16)
-  RUN_CONFIG(16, 2)
-  RUN_CONFIG(16, 4)
-  RUN_CONFIG(16, 8)
-  RUN_CONFIG(16, 16)
-  RUN_CONFIG(32, 2)
-  RUN_CONFIG(32, 4)
-  RUN_CONFIG(32, 8)
-  RUN_CONFIG(64, 2)
-  RUN_CONFIG(64, 4)
+  // Small tile sizes (all should work)
+  RUN_CONFIG(8, 2)    // 1KB
+  RUN_CONFIG(8, 4)    // 1.25KB
+  RUN_CONFIG(8, 8)    // 2.25KB
+  RUN_CONFIG(8, 16)   // 4.25KB
+  
+  // Medium tile sizes
+  RUN_CONFIG(16, 2)   // 3KB
+  RUN_CONFIG(16, 4)   // 5KB
+  RUN_CONFIG(16, 8)   // 9KB
+  RUN_CONFIG(16, 16)  // 17KB
+  
+  // Larger tile sizes (be careful here)
+  RUN_CONFIG(32, 2)   // 12KB
+  RUN_CONFIG(32, 4)   // 20KB
+  RUN_CONFIG(32, 8)   // 36KB
+  
+  // DO NOT include 64x4 (80KB) or 64x8 (144KB) - they exceed 48KB limit!
+  // If you want to test 64, only use MICRO_TILE=2:
+  RUN_CONFIG(64, 2)   // 48KB (might work on some GPUs)
 
   #undef RUN_CONFIG
   
@@ -184,12 +195,12 @@ int main()
   checkCudaError(cudaMemcpy(d_A, h_A.data(), bytes, cudaMemcpyHostToDevice), "A copy H->D");
   checkCudaError(cudaMemcpy(d_B, h_B.data(), bytes, cudaMemcpyHostToDevice), "B copy H->D");
 
-  // Define configurations to test
+  // Only test configurations that will compile!
   std::vector<std::pair<int, int>> configs = {
     {8, 2}, {8, 4}, {8, 8}, {8, 16},
     {16, 2}, {16, 4}, {16, 8}, {16, 16},
     {32, 2}, {32, 4}, {32, 8},
-    {64, 2}, {64, 4}
+    {64, 2}  // Only 64x2, NOT 64x4 or higher!
   };
 
   std::vector<Config> results;
@@ -289,8 +300,10 @@ int main()
     std::cout << "MICRO_TILE: " << best->micro_tile << std::endl;
     std::cout << "Shared Memory: " << best->shared_mem_bytes << " bytes (" 
               << best->shared_mem_bytes / 1024 << " KB)" << std::endl;
-    std::cout << "Average Time: " << best->avg_time_ms << " ms" << std::endl;
-    std::cout << "Performance: " << best->gflops << " GFLOPS" << std::endl;
+    std::cout << "Average Time: " << std::fixed << std::setprecision(3) 
+              << best->avg_time_ms << " ms" << std::endl;
+    std::cout << "Performance: " << std::fixed << std::setprecision(2) 
+              << best->gflops << " GFLOPS" << std::endl;
 
     // Verify correctness
     checkCudaError(cudaMemcpy(h_C.data(), d_C, bytes, cudaMemcpyDeviceToHost), "C copy D->H");
