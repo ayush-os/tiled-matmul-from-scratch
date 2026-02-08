@@ -4,7 +4,7 @@
 #include <vector>
 
 const int MATRIX_DIM = 4096;
-const int TILE_SIZE = 16;
+const int TILE_SIZE = 32;
 const int MICRO_TILE = 8;
 
 __global__ void matmul_kernel(int M, int N, int K, float alpha, const float *A,
